@@ -1,61 +1,120 @@
-const express = require('express');
-const cors = require('cors');
-const bodyParser = require('body-parser');
+const API_BASE_URL = "https://your-api.com"; // Change this to your actual backend API URL
 
-const app = express();
-app.use(cors());
-app.use(bodyParser.json());
+// Function to fetch user balance
+async function fetchBalance(userId) {
+    try {
+        const response = await fetch(`${API_BASE_URL}/balance?user=${userId}`, {
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem("authToken")}`
+            }
+        });
 
-// Dummy database (Replace with actual DB)
-const users = {};  
-const balances = {};  
+        if (!response.ok) {
+            throw new Error("Failed to fetch balance");
+        }
 
-// Signup API
-app.post('/signup', (req, res) => {
-    const { username, password, publicKey, privateKey } = req.body;
+        const data = await response.json();
+        return data.balance;
+    } catch (error) {
+        console.error("Error fetching balance:", error);
+        return null;
+    }
+}
 
-    if (!username || !password) {
-        return res.status(400).json({ message: "Username and password are required." });
+// Function to log in user
+async function loginUser(username, password) {
+    try {
+        const response = await fetch(`${API_BASE_URL}/login`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ username, password })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            localStorage.setItem("authToken", data.token);
+            localStorage.setItem("userId", data.userId); // Store user ID
+            return { success: true, message: "Login successful!" };
+        } else {
+            return { success: false, message: data.message };
+        }
+    } catch (error) {
+        console.error("Login error:", error);
+        return { success: false, message: "An error occurred during login." };
+    }
+}
+
+// Function to sign up a new user
+async function signUpUser(username, password) {
+    try {
+        const response = await fetch(`${API_BASE_URL}/signup`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ username, password })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            return { success: true, message: "Sign-up successful! Please log in." };
+        } else {
+            return { success: false, message: data.message };
+        }
+    } catch (error) {
+        console.error("Sign-up error:", error);
+        return { success: false, message: "An error occurred during sign-up." };
+    }
+}
+
+// Function to transfer funds
+async function transferFunds(sender, receiver, amount, coin, transactionPin) {
+    try {
+        const response = await fetch(`${API_BASE_URL}/transfer`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${localStorage.getItem("authToken")}`
+            },
+            body: JSON.stringify({
+                sender,
+                receiver,
+                amount,
+                coin,
+                pin: transactionPin
+            })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            return { success: true, transactionId: data.transactionId, message: "Transfer successful!" };
+        } else {
+            return { success: false, message: data.message };
+        }
+    } catch (error) {
+        console.error("Transaction error:", error);
+        return { success: false, message: "An error occurred while processing the transaction." };
+    }
+}
+
+// Function to generate public and private keys
+function generateKeys() {
+    let publicKey = "0000";
+    let privateKey = "0000";
+
+    for (let i = 0; i < 31; i++) {
+        publicKey += Math.floor(Math.random() * 10);
+        privateKey += Math.floor(Math.random() * 10);
     }
 
-    if (users[username]) {
-        return res.status(400).json({ message: "User already exists." });
-    }
+    return { publicKey, privateKey };
+}
 
-    users[username] = { password, publicKey, privateKey };
-    balances[publicKey] = 1000;  // Assign default balance
+// Export functions (for use in other JavaScript files)
+export { fetchBalance, loginUser, signUpUser, transferFunds, generateKeys };
 
-    res.json({ message: "Signup successful!", publicKey });
-});
-
-// Login API
-app.post('/login', (req, res) => {
-    const { username, password } = req.body;
-
-    if (!users[username] || users[username].password !== password) {
-        return res.status(401).json({ message: "Invalid username or password." });
-    }
-
-    res.json({ message: "Login successful!", publicKey: users[username].publicKey });
-});
-
-// Fund Transfer API
-app.post('/transfer', (req, res) => {
-    const { senderNumber, receiverNumber, amount } = req.body;
-
-    if (!balances[senderNumber] || !balances[receiverNumber]) {
-        return res.status(400).json({ message: "Invalid sender or receiver." });
-    }
-
-    if (balances[senderNumber] < amount) {
-        return res.status(400).json({ message: "Insufficient balance." });
-    }
-
-    balances[senderNumber] -= amount;
-    balances[receiverNumber] += amount;
-
-    res.json({ message: "Transfer successful!", senderBalance: balances[senderNumber] });
-});
-
-// Start Server
-app.listen(5000, () => console.log("Server running on port 5000"));
