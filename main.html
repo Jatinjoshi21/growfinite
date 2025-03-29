@@ -343,21 +343,57 @@
             toggleMenu();
         });
 
-        function transferFunds() {
-            const senderNumber = document.getElementById('senderNumber').value;
-            const receiverNumber = document.getElementById('receiverNumber').value;
-            const amount = parseFloat(document.getElementById('amount').value); // Use parseFloat to handle decimal values
-            const coin = document.getElementById('coin');
-            const moneyFlow = document.getElementById('moneyFlow');
+async function transferFunds() {
+    const senderNumber = document.getElementById('senderNumber').value;
+    const receiverNumber = document.getElementById('receiverNumber').value;
+    const amount = parseFloat(document.getElementById('amount').value); // Handle decimals
+    const transactionPin = document.getElementById('transactionPin').value; // Get transaction pin
+    const coin = document.getElementById('coin');  // (If this represents currency type, get its value)
+    const moneyFlow = document.getElementById('moneyFlow');
+
+    if (!senderNumber || !receiverNumber || isNaN(amount) || !transactionPin) {
+        alert("Please fill in all fields with valid numbers.");
+        return;
+    } else if (amount > balance) {
+        alert("Insufficient balance.");
+        return;
+    }
+
+    try {
+        // Call your backend API to process the transaction
+        const response = await fetch('https://your-api.com/transfer', {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${localStorage.getItem("authToken")}` // Include auth token if required
+            },
+            body: JSON.stringify({
+                sender: senderNumber,
+                receiver: receiverNumber,
+                amount: amount,
+                coin: coin ? coin.value : "USD", // Example, use appropriate currency if needed
+                pin: transactionPin
+            })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            balance -= amount; // Deduct locally (only for UI updates)
+            document.querySelector('.balance').innerText = 'Balance: $' + balance;
+            
+            moneyFlow.innerHTML = `<span style="color: green;">Transaction Successful!</span>`; 
+            alert(`Transfer successful!\nTransaction ID: ${data.transactionId}`);
+        } else {
+            moneyFlow.innerHTML = `<span style="color: red;">Transaction Failed: ${data.message}</span>`; 
+            alert(`Transaction failed: ${data.message}`);
+        }
+    } catch (error) {
+        console.error("Error:", error);
+        alert("An error occurred while processing the transaction.");
+    }
 
 
-            if (!senderNumber || !receiverNumber || isNaN(amount)) {  //isNaN is to confirm if the amount isnt a number
-                alert("Please fill in all fields with valid numbers.");
-                return;
-            } else if (amount > balance) {
-                alert("Insufficient balance.");
-                return;
-            }
 
 
             //Coin animation
